@@ -1,0 +1,75 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      # Enable Eureka-based service discovery for routing
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+
+      routes:
+        # ── User Service ──────────────────────────────────────────
+        - id: user-service
+          uri: lb://user-service        # lb:// = load-balanced via Eureka
+          predicates:
+            - Path=/api/v1/users/**
+          filters:
+            #- name: RequestRateLimiter  # we'll configure this later with Redis
+            - AddRequestHeader=X-Gateway-Source, api-gateway
+            - AddResponseHeader=X-Response-Time, ${spring.application.name}
+
+        # ── Product Service ───────────────────────────────────────
+        - id: product-service
+          uri: lb://product-service
+          predicates:
+            - Path=/api/v1/products/**
+          filters:
+            - AddRequestHeader=X-Gateway-Source, api-gateway
+            - AddResponseHeader=X-Response-Time, ${spring.application.name}
+
+      # Global CORS configuration
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+
+# Eureka registration
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    fetch-registry: true
+    register-with-eureka: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+  endpoint:
+    health:
+      show-details: always
+    gateway:
+      enabled: true
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    com.ecommerce: DEBUG
