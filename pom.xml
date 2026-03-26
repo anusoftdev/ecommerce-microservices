@@ -16,6 +16,8 @@
         <module>common-lib</module>
         <module>product-service</module>
         <module>service-registry</module>
+        <module>api-gateway</module>
+        <module>order-service</module>
     </modules>
 
     <properties>

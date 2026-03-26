@@ -33,6 +33,14 @@ spring:
             - AddRequestHeader=X-Gateway-Source, api-gateway
             - AddResponseHeader=X-Response-Time, ${spring.application.name}
 
+        # ── Order Service ───────────────────────────────────────
+        - id: order-service
+          uri: lb://order-service
+          predicates:
+            - Path=/api/v1/orders/**
+          filters:
+            - AddRequestHeader=X-Gateway-Source, api-gateway
+
       # Global CORS configuration
       globalcors:
         cors-configurations:
