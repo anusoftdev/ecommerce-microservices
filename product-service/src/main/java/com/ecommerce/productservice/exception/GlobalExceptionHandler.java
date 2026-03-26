@@ -1,4 +1,4 @@
-package com.ecommerce.userservice.exception;
+package com.ecommerce.productservice.exception;
 
 import com.ecommerce.commonlib.dto.ApiResponse;
 import com.ecommerce.commonlib.exception.BaseException;

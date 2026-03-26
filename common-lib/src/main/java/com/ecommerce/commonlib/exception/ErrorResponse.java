@@ -8,12 +8,11 @@ public record ErrorResponse(
         Object details,
         LocalDateTime timestamp
 ) {
-    // Convenience constructor without details
-    public ErrorResponse(String errorCode, String message) {
-        this(errorCode, message, null, LocalDateTime.now());
+    public static ErrorResponse of(String errorCode, String message) {
+        return new ErrorResponse(errorCode, message, null, LocalDateTime.now());
     }
 
-    public ErrorResponse(String errorCode, String message, Object details) {
-        this(errorCode, message, details, LocalDateTime.now());
+    public static ErrorResponse of(String errorCode, String message, Object details) {
+        return new ErrorResponse(errorCode, message, details, LocalDateTime.now());
     }
 }
