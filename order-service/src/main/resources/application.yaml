@@ -34,11 +34,99 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,circuitbreakers
   endpoint:
     health:
       show-details: always
+      show-components: always
+  health:
+    circuitbreakers:
+      enabled: true
+    retries:
+      enabled: true
 
 logging:
   level:
     com.ecommerce: DEBUG
+
+resilience4j:
+  # ── Circuit Breaker ────────────────────────────────────────────────
+  circuitbreaker:
+    instances:
+      userServiceCB:
+        # How many calls to sample for failure rate calculation
+        sliding-window-size: 10
+        # Open circuit if failure rate exceeds 50%
+        failure-rate-threshold: 50
+        # Minimum calls before calculating failure rate
+        minimum-number-of-calls: 5
+        # How long to stay OPEN before trying HALF-OPEN
+        wait-duration-in-open-state: 10s
+        # Number of calls allowed in HALF-OPEN state
+        permitted-number-of-calls-in-half-open-state: 3
+        # Also treat slow calls as failures
+        slow-call-rate-threshold: 50
+        slow-call-duration-threshold: 2s
+        register-health-indicator: true
+
+      productServiceCB:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        minimum-number-of-calls: 5
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        slow-call-rate-threshold: 50
+        slow-call-duration-threshold: 2s
+        register-health-indicator: true
+
+  # ── Retry ──────────────────────────────────────────────────────────
+  retry:
+    instances:
+      userServiceRetry:
+        # Number of retry attempts (including first call)
+        max-attempts: 3
+        # Wait between retries
+        wait-duration: 500ms
+        # Only retry on these exceptions
+        retry-exceptions:
+          - org.springframework.web.reactive.function.client.WebClientRequestException
+          - java.util.concurrent.TimeoutException
+        # Do NOT retry on these (4xx are client errors, not transient)
+        ignore-exceptions:
+          - org.springframework.web.reactive.function.client.WebClientResponseException$NotFound
+          - org.springframework.web.reactive.function.client.WebClientResponseException$BadRequest
+
+      productServiceRetry:
+        max-attempts: 3
+        wait-duration: 500ms
+        retry-exceptions:
+          - org.springframework.web.reactive.function.client.WebClientRequestException
+          - java.util.concurrent.TimeoutException
+        ignore-exceptions:
+          - org.springframework.web.reactive.function.client.WebClientResponseException$NotFound
+          - org.springframework.web.reactive.function.client.WebClientResponseException$BadRequest
+
+  # ── Timeout ────────────────────────────────────────────────────────
+  timelimiter:
+    instances:
+      userServiceCB:
+        # Cancel the call if it takes longer than this
+        timeout-duration: 3s
+        cancel-running-future: true
+      productServiceCB:
+        timeout-duration: 3s
+        cancel-running-future: true
+
+  # ── Bulkhead (concurrent call limit) ──────────────────────────────
+  bulkhead:
+    instances:
+      userServiceBulkhead:
+        # Max concurrent calls to user-service
+        max-concurrent-calls: 10
+        # How long to wait for a slot before rejecting
+        max-wait-duration: 100ms
+      productServiceBulkhead:
+        max-concurrent-calls: 10
+        max-wait-duration: 100ms
+
+# Expose circuit breaker health in actuator

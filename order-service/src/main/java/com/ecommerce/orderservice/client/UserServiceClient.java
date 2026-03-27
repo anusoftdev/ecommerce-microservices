@@ -2,6 +2,9 @@ package com.ecommerce.orderservice.client;
 
 import com.ecommerce.commonlib.dto.ApiResponse;
 import com.ecommerce.orderservice.client.dto.UserResponse;
+import io.github.resilience4j.bulkhead.annotation.Bulkhead;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
@@ -17,27 +20,32 @@ import java.util.Optional;
 public class UserServiceClient {
 
     private final WebClient.Builder webClientBuilder;
-
     private static final String USER_SERVICE_URL = "http://user-service";
+    private static final String CB_NAME = "userServiceCB";
+    private static final String BULKHEAD_NAME = "userServiceBulkhead";
 
+    @CircuitBreaker(name = CB_NAME, fallbackMethod = "getUserByIdFallback")
+    @Retry(name = "userServiceRetry")
+    @Bulkhead(name = BULKHEAD_NAME)
     public Optional<UserResponse> getUserById(Long userId) {
-        try {
-            ApiResponse<UserResponse> response = webClientBuilder.build()
-                    .get()
-                    .uri(USER_SERVICE_URL + "/api/v1/users/{id}", userId)
-                    .retrieve()
-                    .bodyToMono(new ParameterizedTypeReference<ApiResponse<UserResponse>>() {})
-                    .block(); // blocking — we're in a servlet (MVC) context
+        log.info("Calling user-service for userId: {}", userId);
 
-            return Optional.ofNullable(response)
-                    .map(ApiResponse::data);
+        ApiResponse<UserResponse> response = webClientBuilder.build()
+                .get()
+                .uri(USER_SERVICE_URL + "/api/v1/users/{id}", userId)
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<ApiResponse<UserResponse>>() {})
+                .block();
 
-        } catch (WebClientResponseException.NotFound e) {
-            log.warn("User not found with id: {}", userId);
-            return Optional.empty();
-        } catch (Exception e) {
-            log.error("Error calling user-service for userId: {}", userId, e);
-            return Optional.empty();
-        }
+        return Optional.ofNullable(response).map(ApiResponse::data);
+    }
+
+    // Fallback — called when circuit is OPEN or all retries exhausted
+    private Optional<UserResponse> getUserByIdFallback(Long userId, Exception ex) {
+        log.error("Fallback triggered for getUserById userId={} reason={}",
+                userId, ex.getMessage());
+
+        // Return empty — caller (OrderService) will throw BusinessException
+        return Optional.empty();
     }
 }
