@@ -9,10 +9,8 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
+@Getter @Setter
+@NoArgsConstructor @AllArgsConstructor
 @Builder
 public class User {
 
@@ -30,11 +28,16 @@ public class User {
     private String lastName;
 
     @Column(nullable = false)
-    private String password; // will be hashed later
+    private String password;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private UserStatus status;
+
+    // Role controls what the user can do across the system
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Role role;
 
     @CreationTimestamp
     private LocalDateTime createdAt;
@@ -46,4 +49,8 @@ public class User {
         ACTIVE, INACTIVE, SUSPENDED
     }
 
+    public enum Role {
+        ROLE_USER,   // Regular customer
+        ROLE_ADMIN   // Admin with elevated privileges
+    }
 }

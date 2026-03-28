@@ -15,6 +15,11 @@ spring:
 
       routes:
         # ── User Service ──────────────────────────────────────────
+        - id: user-service-auth
+          uri: lb://user-service
+          predicates:
+              - Path=/api/v1/auth/**
+
         - id: user-service
           uri: lb://user-service        # lb:// = load-balanced via Eureka
           predicates:
