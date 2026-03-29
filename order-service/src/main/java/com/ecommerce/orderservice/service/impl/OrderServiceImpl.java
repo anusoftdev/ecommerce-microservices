@@ -1,6 +1,9 @@
 package com.ecommerce.orderservice.service.impl;
 
 import com.ecommerce.commonlib.enums.ErrorCode;
+import com.ecommerce.commonlib.event.OrderCancelledEvent;
+import com.ecommerce.commonlib.event.OrderCreatedEvent;
+import com.ecommerce.commonlib.event.OrderItemEvent;
 import com.ecommerce.commonlib.exception.BusinessException;
 import com.ecommerce.commonlib.util.PageResponse;
 import com.ecommerce.orderservice.client.ProductServiceClient;
@@ -12,6 +15,7 @@ import com.ecommerce.orderservice.dto.request.OrderItemRequest;
 import com.ecommerce.orderservice.dto.response.OrderResponse;
 import com.ecommerce.orderservice.entity.Order;
 import com.ecommerce.orderservice.entity.OrderItem;
+import com.ecommerce.orderservice.event.OrderEventPublisher;
 import com.ecommerce.orderservice.exception.OrderNotFoundException;
 import com.ecommerce.orderservice.mapper.OrderMapper;
 import com.ecommerce.orderservice.repository.OrderRepository;
@@ -37,6 +41,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderMapper orderMapper;
     private final UserServiceClient userServiceClient;
     private final ProductServiceClient productServiceClient;
+    private final OrderEventPublisher eventPublisher;
 
     @Override
     public OrderResponse createOrder(CreateOrderRequest request) {
@@ -89,6 +94,31 @@ public class OrderServiceImpl implements OrderService {
         Order saved = orderRepository.save(order);
 
         log.info("Order created: {} for user: {}", saved.getOrderNumber(), request.userId());
+
+        List<OrderItemEvent> eventItems = saved.getItems().stream()
+                .map(item -> new OrderItemEvent(
+                        item.getProductId(),
+                        item.getProductName(),
+                        item.getProductSku(),
+                        item.getQuantity(),
+                        item.getUnitPrice(),
+                        item.getTotalPrice()
+                ))
+                .toList();
+
+        OrderCreatedEvent event = OrderCreatedEvent.of(
+                saved.getOrderNumber(),
+                saved.getId(),
+                saved.getUserId(),
+                user.email(),          // from the UserResponse we already fetched
+                eventItems,
+                saved.getTotalAmount(),
+                saved.getShippingAddress()
+        );
+
+        eventPublisher.publishOrderCreated(event);
+        log.info("Published ORDER_CREATED event for: {}", saved.getOrderNumber());
+
         return orderMapper.toResponse(saved);
     }
 
@@ -133,7 +163,17 @@ public class OrderServiceImpl implements OrderService {
         }
 
         order.setStatus(Order.OrderStatus.CANCELLED);
-        return orderMapper.toResponse(orderRepository.save(order));
+        Order cancelOrder = orderRepository.save(order);
+
+        OrderCancelledEvent cancelEvent = OrderCancelledEvent.of(
+                cancelOrder.getOrderNumber(),
+                cancelOrder.getId(),
+                cancelOrder.getUserId(),
+                "Cancelled by user"
+        );
+        eventPublisher.publishOrderCancelled(cancelEvent);
+        log.info("Published ORDER_CANCELLED event for: {}", cancelOrder.getOrderNumber());
+        return orderMapper.toResponse(cancelOrder);
     }
 
     private String generateOrderNumber() {

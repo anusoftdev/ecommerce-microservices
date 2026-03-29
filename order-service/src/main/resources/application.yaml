@@ -20,6 +20,24 @@ spring:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      # Unique ID for this producer — helps Kafka deduplicate
+      client-id: order-service-producer
+      # Strongest durability — wait for all replicas to acknowledge
+      acks: all
+      # Retry on transient failures
+      retries: 3
+      # JSON serializer for both key and value
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        # Embed type info so consumer knows which class to deserialize to
+        spring.json.add.type.headers: true
+        # Idempotent producer — exactly-once delivery guarantee
+        enable.idempotence: true
+
 eureka:
   client:
     service-url:
@@ -136,3 +154,4 @@ application:
   security:
     jwt:
       secret-key: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+

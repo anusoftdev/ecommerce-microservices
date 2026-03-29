@@ -1,0 +1,45 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: notification-service
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      # Consumer group — Kafka tracks offset per group
+      # If multiple instances run, Kafka load-balances partitions
+      group-id: notification-service-group
+      # Read from beginning if no offset stored for this group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        # Trust our event classes for deserialization
+        spring.json.trusted.packages: "com.ecommerce.commonlib.event"
+        spring.json.use.type.headers: true
+    listener:
+      # Commit offset only after successful processing
+      # — prevents losing events if service crashes mid-processing
+      ack-mode: RECORD
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    com.ecommerce: DEBUG
