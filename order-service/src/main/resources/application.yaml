@@ -38,6 +38,10 @@ spring:
         # Idempotent producer — exactly-once delivery guarantee
         enable.idempotence: true
 
+  zipkin:
+    base-url: http://localhost:9411
+    enabled: true
+
 eureka:
   client:
     service-url:
@@ -52,16 +56,32 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,circuitbreakers
+        include: health,info,metrics,circuitbreakers,prometheus
   endpoint:
     health:
       show-details: always
       show-components: always
+    prometheus:
+      enabled: true
   health:
     circuitbreakers:
       enabled: true
     retries:
       enabled: true
+  metrics:
+    tags:
+      # Adds service name tag to every metric —
+      # essential for filtering in Prometheus/Grafana
+      application: ${spring.application.name}
+      distribution:
+        # Track percentiles for latency metrics
+        percentiles-histogram:
+          http.server.requests: true
+        percentiles:
+          http.server.requests: 0.5, 0.95, 0.99
+  tracing: # 1.0 = 100% sampling — use 0.1 (10%) in production
+    sampling:
+      probability: 1.0
 
 logging:
   level:

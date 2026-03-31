@@ -18,8 +18,10 @@ import com.ecommerce.orderservice.entity.OrderItem;
 import com.ecommerce.orderservice.event.OrderEventPublisher;
 import com.ecommerce.orderservice.exception.OrderNotFoundException;
 import com.ecommerce.orderservice.mapper.OrderMapper;
+import com.ecommerce.orderservice.metrics.OrderMetrics;
 import com.ecommerce.orderservice.repository.OrderRepository;
 import com.ecommerce.orderservice.service.OrderService;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
@@ -42,10 +44,12 @@ public class OrderServiceImpl implements OrderService {
     private final UserServiceClient userServiceClient;
     private final ProductServiceClient productServiceClient;
     private final OrderEventPublisher eventPublisher;
+    private final OrderMetrics orderMetrics;
 
     @Override
     public OrderResponse createOrder(CreateOrderRequest request) {
         log.info("Creating order for userId: {}", request.userId());
+        Timer.Sample timerSample = orderMetrics.startOrderTimer();
 
         // 1. Validate user exists
         UserResponse user = userServiceClient.getUserById(request.userId())
@@ -119,6 +123,9 @@ public class OrderServiceImpl implements OrderService {
         eventPublisher.publishOrderCreated(event);
         log.info("Published ORDER_CREATED event for: {}", saved.getOrderNumber());
 
+        orderMetrics.recordOrderCreated(saved.getTotalAmount());
+        orderMetrics.stopOrderTimer(timerSample);
+
         return orderMapper.toResponse(saved);
     }
 
@@ -164,6 +171,8 @@ public class OrderServiceImpl implements OrderService {
 
         order.setStatus(Order.OrderStatus.CANCELLED);
         Order cancelOrder = orderRepository.save(order);
+
+        orderMetrics.recordOrderCancelled();
 
         OrderCancelledEvent cancelEvent = OrderCancelledEvent.of(
                 cancelOrder.getOrderNumber(),
